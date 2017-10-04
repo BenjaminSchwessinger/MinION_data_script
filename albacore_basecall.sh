@@ -1,8 +1,8 @@
 #!/bin/bash
 #PBS -P xf3
 #PBS -q express
-#PBS -l walltime=24:00:00,mem=120GB,ncpus=16
-#PBS -l jobfs=500GB
+#PBS -l walltime=24:00:00,mem=120GB,ncpus=16 #this needs to be change to a short time if you run it only for one flow cell
+#PBS -l jobfs=200GB #don't use more than 400Gb as this can cause issue I can explain in person
 
 set -vx
 
@@ -34,19 +34,23 @@ cp ${INPUT}/*tar.gz workspace/.
 cd workspace
 for x in *.tar.gz
 do
-tar -xopf ${x}
+tar -xopf ${x}& #added the & to unzip evertyghin at once
 done
+
+wait
 
 mkdir fast5s
 #check if this makes sense
-mv */fast5 fast5s/.
+#mv */fast5 fast5s/. not needed if you run albacore recursively
 
-export PYTHONPATH=$HOME/myapps/albacore/2.0.2/lib/python3.6/site-packages
+export PYTHONPATH=$HOME/myapps/albacore/2.0.2/lib/python3.6/site-packages #these should be part of your module file for albacore
 export PATH=/home/106/yh7166/myapps/albacore/2.0.2/bin/:$PATH
 module load python3/3.6.2
 
 # basecall with albacore
-read_fast5_basecaller.py -i ./fast5s -t $threads -s $PBS_JOBFS/albacore_output -f $flowcellID -k $kitID -r -n 0 -q 99999999999999999 -o fastq,fast5
+read_fast5_basecaller.py -i ./fast5s -t $threads -s $PBS_JOBFS/albacore_output -f $flowcellID -k $kitID -r -n 0 -q 99999999999999999 -o fastq
+
+#it doesn't seem you are doing anything with the fast5 file so maybe simply don't generate them for now.
 
 #now pull out fastq and summary files before zipping up stuff
 
@@ -59,12 +63,9 @@ cat albacore_output/*.fastq > ${name}/${name}.fastq
 #remove original gz files and zip up stuff
 rm -r workspace
 tar -cvzf ${name}.tar.gz ${name}
-rm -r ${name}
+#rm -r ${name} no need to remove the folder as it gets deleted anyways once your job finishes
 
 #now move everything from this step down already
 mv ${name}.tar.gz ${OUTPUT}/.
 
 
-
-#cd ${PBS_JOBFS}
-#mv * ${OUTPUT}/.
